@@ -18,7 +18,7 @@
  */
 
 
-#define 	UPDATE_INTERVAL 2000 			/* Countdown update period in 
+#define 	UPDATE_INTERVAL 1000 			/* Countdown update period in 
 											milliseconds */
 #define PBAR_THICKNESS  10
 
@@ -209,7 +209,7 @@ static gboolean update_function (gpointer data){
               
               
               if ((strlen(command) == 0) || !pd->nowin_if_alarm) {
-                  gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 1);
+//                  gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 1);
                   
                   /* Display the name of the alarm when the countdown ends */
                   dialog_message = g_strdup_printf(_("Beeep! :) \nTime is up for the alarm %s."), alrm->name);
