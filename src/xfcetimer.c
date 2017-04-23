@@ -67,24 +67,33 @@ void make_menu(plugin_data *pd);
 **/
 static gboolean repeat_alarm (gpointer data){
 
-  plugin_data *pd=(plugin_data *)data;
+  alarm_t *alrm;
+  alrm = (alarm_t *) data;
+  plugin_data *pd = alrm->pd;
 
   /* Don't repeat anymore */
-  if(pd->rem_repetitions == 0){
+  if(alrm->rem_repetitions == 0){
 
-    if(pd->timeout_command)
-        g_free(pd->timeout_command);
-    pd->timeout_command=NULL;
-    pd->alarm_repeating=FALSE;
+//    if(pd->timeout_command)
+//        g_free(pd->timeout_command);
+//    pd->timeout_command=NULL;
+    alrm->isRepeating=FALSE;
     //make_menu(pd);
 
     return FALSE;
-
-
   }
 
-  g_spawn_command_line_async (pd->timeout_command,NULL);
-  pd->rem_repetitions = pd->rem_repetitions -1 ;
+  gchar *command;
+  
+  if (strlen(alrm->command)>0)
+      command = g_strdup(alrm->command);
+  else if (pd->use_global_command)
+      command = g_strdup (pd->global_command);
+  else
+      command = g_strdup("");
+          
+  g_spawn_command_line_async (command, NULL);
+  alrm->rem_repetitions = alrm->rem_repetitions -1 ;
   return TRUE;
 }
 
@@ -134,103 +143,121 @@ static gboolean update_function (gpointer data){
   gint elapsed_sec,remaining;
   gchar *tiptext = NULL, *temp, *dialog_title, *dialog_message;
   GtkWidget *dialog;
+  GList *list = NULL;
+  alarm_t *alrm;
+  gboolean callAgain = FALSE;
 
-  elapsed_sec=(gint)g_timer_elapsed(pd->timer,NULL);
+  list = pd->alarm_list;
 
-  /* If countdown is not over, update tooltip */
-  if(elapsed_sec < pd->timeout_period_in_sec){
-
-     remaining=pd->timeout_period_in_sec-elapsed_sec;
-
-     if(remaining>=3600)
-       tiptext = g_strdup_printf(_("%dh %dm %ds left"),remaining/3600, (remaining%3600)/60,
-            remaining%60);
-     else if (remaining>=60)
-       tiptext = g_strdup_printf(_("%dm %ds left"),remaining/60, remaining%60);
-     else
-       tiptext = g_strdup_printf(_("%ds left"),remaining);
-       
-     if(pd->is_paused) {
-       temp = g_strconcat(tiptext,_(" (Paused)"),NULL);
-       g_free (tiptext);
-       tiptext = temp;
-     }
-     gtk_progress_bar_set_fraction  (GTK_PROGRESS_BAR(pd->pbar),
-                    1.0-((gdouble)elapsed_sec)/pd->timeout_period_in_sec);
-
-     gtk_tooltips_set_tip(pd->tip,GTK_WIDGET(pd->base),tiptext,NULL);
-
-     g_free(tiptext);
-
-     return TRUE;
-
+  while (list){
+      alrm = (alarm_t *) list->data;
+      if(alrm->isActive){
+          
+          elapsed_sec = (gint) g_timer_elapsed(alrm->timer, NULL);
+          
+          /* If countdown is not over, update tooltip */
+          if (elapsed_sec < alrm->timeout_period_in_sec) {
+              
+              remaining = alrm->timeout_period_in_sec - elapsed_sec;
+              
+              if (remaining >= 3600)
+                  tiptext = g_strdup_printf(_("%dh %dm %ds left"), remaining / 3600, (remaining % 3600) / 60,
+                          remaining % 60);
+              else if (remaining >= 60)
+                  tiptext = g_strdup_printf(_("%dm %ds left"), remaining / 60, remaining % 60);
+              else
+                  tiptext = g_strdup_printf(_("%ds left"), remaining);
+              
+              if (alrm->isPaused) {
+                  temp = g_strconcat(tiptext, _(" (Paused)"), NULL);
+                  g_free(tiptext);
+                  tiptext = temp;
+              }
+              gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),
+                      1.0 - ((gdouble) elapsed_sec) / alrm->timeout_period_in_sec);
+              
+              gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), tiptext, NULL);
+              
+              g_free(tiptext);
+              
+              callAgain =  TRUE;
+              continue;
+          }
+          
+          /* Countdown is over, stop timer and free resources */
+          if (alrm->timer)
+              g_timer_destroy(alrm->timer);
+          alrm->timer = NULL;
+          
+          /* Disable tooltips, reset pbar */
+          gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), "", NULL);
+          gtk_tooltips_disable(pd->tip);
+          gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 0);
+          
+          alrm->timeout = 0;
+          
+          alrm->isActive = FALSE;
+          
+          gchar *command;
+          
+          /* If an alarm command is set, it overrides the default (if any) */
+          if (strlen(alrm->command)>0)
+              command = g_strdup(alrm->command);
+          else if (pd->use_global_command)
+              command = g_strdup (pd->global_command);
+          else
+              command = g_strdup("");
+          
+          
+          if ((strlen(command) == 0) || !pd->nowin_if_alarm) {
+              gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 1);
+              
+              /* Display the name of the alarm when the countdown ends */
+              dialog_message = g_strdup_printf(_("Beeep! :) \nTime is up for the alarm %s."), alrm->name);
+              dialog_title = g_strdup_printf("Xfce4 Timer Plugin: %s", alrm->name);
+              
+              dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL,
+                      GTK_MESSAGE_WARNING,
+                      GTK_BUTTONS_NONE, dialog_message);
+              
+              gtk_window_set_title((GtkWindow *) dialog, dialog_title);
+              
+              gtk_dialog_add_button((GtkDialog *) dialog, GTK_STOCK_CLOSE, 0);
+              gtk_dialog_add_button((GtkDialog *) dialog, _("Rerun the timer"), 1);
+              
+              g_signal_connect(dialog, "response",
+                      G_CALLBACK(dialog_response),
+                      pd);
+              
+              g_free(dialog_title);
+              g_free(dialog_message);
+              
+              gtk_widget_show(dialog);
+          }
+          
+          if (strlen(command) > 0) {
+              
+              g_spawn_command_line_async(command, NULL);
+              
+              if (pd->repeat_alarm_command) {
+                  alrm->isRepeating = TRUE;
+                  alrm->rem_repetitions = pd->repetitions;
+                  if (alrm->repeat_timeout != 0)
+                      g_source_remove(alrm->repeat_timeout);
+                  alrm->repeat_timeout = g_timeout_add(pd->repeat_interval * 1000, repeat_alarm, alrm);
+              } else {
+                  if (command)
+                      g_free(command);
+                  command = NULL;
+              }
+          }
+          
+      }
+      
+      list = g_list_next (list);
   }
-
-  /* Countdown is over, stop timer and free resources */
-
-  if(pd->timer)
-     g_timer_destroy(pd->timer);
-  pd->timer=NULL;
   
-  /* Disable tooltips, reset pbar */
-  gtk_tooltips_set_tip(pd->tip,GTK_WIDGET(pd->base),"",NULL);
-  gtk_tooltips_disable(pd->tip);
-  gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),0);
-    
-  pd->timeout=0;
-
-  pd->timer_on=FALSE;
-  
-  if( (strlen(pd->timeout_command)==0) || !pd->nowin_if_alarm ) {
-    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),1);
-
-	/* Display the name of the alarm when the countdown ends */
-    dialog_message = g_strdup_printf(_("Beeep! :) \nTime is up for the alarm %s."), pd->active_timer_name);
-    dialog_title = g_strdup_printf("Xfce4 Timer Plugin: %s", pd->active_timer_name);
-
-    dialog = gtk_message_dialog_new (NULL, GTK_DIALOG_MODAL,
-                                    GTK_MESSAGE_WARNING,
-                                    GTK_BUTTONS_NONE, dialog_message);
-                           
-    gtk_window_set_title ((GtkWindow *) dialog, dialog_title);                                    
- 
-    gtk_dialog_add_button ( (GtkDialog *) dialog, GTK_STOCK_CLOSE, 0);
-	gtk_dialog_add_button ( (GtkDialog *) dialog, _("Rerun the timer"), 1);
-
-    g_signal_connect (dialog, "response",
-                           G_CALLBACK (dialog_response),
-                           pd);
-                           
-	g_free(dialog_title);
-	g_free(dialog_message);
-	
-    gtk_widget_show(dialog);
-  }
-
-  if(strlen(pd->timeout_command)>0) {
-
-    g_spawn_command_line_async (pd->timeout_command,NULL);
-
-    if(pd->repeat_alarm){
-        pd->alarm_repeating=TRUE;
-        pd->rem_repetitions=pd->repetitions;
-        if(pd->repeat_timeout!=0)
-            g_source_remove(pd->repeat_timeout);
-        pd->repeat_timeout = g_timeout_add(pd->repeat_interval*1000,repeat_alarm,pd);
-    }
-    else
-    {
-        if(pd->timeout_command)
-            g_free(pd->timeout_command);
-        pd->timeout_command=NULL;
-    }
-  }
-
-  //make_menu(pd);
-
-  /* This function won't be called again */
-  return FALSE;
-
+  return callAgain;
 }
 
 /**
@@ -262,7 +289,7 @@ static void timer_selected (GtkWidget* menuitem, gpointer data){
   pd->selected = list;
 
   /* start the timer if the option to do so on selecting is set */
-  if(pd->selecting_starts && !pd->timer_on)
+  if(pd->selecting_starts)// && !pd->timer_on)  //no need to check because timers should be concurrent
     start_stop_selected(menuitem,pd);  
 
 }
@@ -289,24 +316,6 @@ static void start_timer (plugin_data *pd){
 
   alrm = (alarm_t *) pd->selected->data;
   
-  /* Record the timer name */
-  if (pd->active_timer_name)
-	g_free(pd->active_timer_name);
-	
-  pd->active_timer_name = g_strdup(alrm->name); /* It's freed next time 
-  															or at exit */ 
-  if(pd->timeout_command)
-    g_free(pd->timeout_command);
-    
-  /* If an alarm command is set, it overrides the default (if any) */
-  if (strlen(alrm->command)>0)
-	pd->timeout_command = g_strdup(alrm->command); /* It's freed next 
-															time or at exit */
-  else if (pd->use_global_command)
-	pd->timeout_command = g_strdup (pd->global_command);
-  else
-	pd->timeout_command = g_strdup("");
-  
   /* If it's a 24h type alarm, we find the difference with current time
      Here 'time' is in minutes */
   if(!alrm->iscountdown) {
@@ -325,27 +334,26 @@ static void start_timer (plugin_data *pd){
      if(timeout_period <0)
         timeout_period+= 24*60*60;
         
-     pd->is_countdown = FALSE;
+     alrm->iscountdown = FALSE;
 
   }
   /* Else 'pd->selected->time' already gives the countdown period in seconds */
   else {
-  
-	  pd->is_countdown = TRUE;
+      alrm->iscountdown = TRUE;
       timeout_period = alrm->time;
-
   }
-  pd->timeout_period_in_sec=timeout_period;
+  
+  alrm->timeout_period_in_sec=timeout_period;
 
   /* start the timer */
-  pd->timer=g_timer_new();
-  pd->timer_on=TRUE;
+  alrm->timer=g_timer_new();
+  alrm->isActive=TRUE;
 
   gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), alrm->info, NULL);
   gtk_tooltips_enable(pd->tip);
 
-  g_timer_start(pd->timer);
-  pd->timeout = g_timeout_add(UPDATE_INTERVAL, update_function,pd);
+  g_timer_start(alrm->timer);
+  alrm->timeout = g_timeout_add(UPDATE_INTERVAL, update_function,pd);
   											
 }
 /**
@@ -354,9 +362,9 @@ static void start_timer (plugin_data *pd){
 **/
 
 static void start_stop_selected (GtkWidget* menuitem, gpointer
-                                        data){
+                                        plugindata){
 
-  plugin_data *pd=(plugin_data *)data;
+  plugin_data *pd=(plugin_data *)plugindata;
   GSList *group=NULL;
   gchar temp[8];
   gint row_count,cur_h,cur_m,cur_s,time;
@@ -365,25 +373,27 @@ static void start_stop_selected (GtkWidget* menuitem, gpointer
   GTimeVal timeval;
   struct tm *current;
   alarm_t *alrm;
+  alrm = (alarm_t *) pd->selected->data;
+  
+  /* If timer is active destroy it*/
+  if(alrm->isActive){
 
-  /* If counting down, we stop the timer and free the resources */
-  if(pd->timer_on){
+    if(alrm->timer)
+       g_timer_destroy(alrm->timer);
+    if(alrm->timeout)
+       g_source_remove(alrm->timeout);
+//    if(pd->timeout_command)
+//       g_free(pd->timeout_command);
+//    if(pd->active_timer_name)
+//       g_free(pd->active_timer_name);
 
-    if(pd->timer)
-       g_timer_destroy(pd->timer);
-    if(pd->timeout)
-       g_source_remove(pd->timeout);
-    if(pd->timeout_command)
-       g_free(pd->timeout_command);
-    if(pd->active_timer_name)
-       g_free(pd->active_timer_name);
-
-    pd->timer = NULL;
-    pd->timeout_command = NULL;
-    pd->active_timer_name = NULL;
-    pd->timeout = 0;
-    pd->timer_on = FALSE;
-    pd->is_paused = FALSE;
+    alrm->timer = NULL;
+//    pd->timeout_command = NULL;
+//    pd->active_timer_name = NULL;
+    alrm->timeout = 0;
+//    pd->timer_on = FALSE;
+    alrm->isPaused = FALSE;
+    alrm->isActive = FALSE;
 
     /* Disable tooltips, reset pbar */
     gtk_tooltips_set_tip(pd->tip,GTK_WIDGET(pd->base),"",NULL);
@@ -404,19 +414,21 @@ static void pause_resume_selected (GtkWidget* menuitem, gpointer
                                         data){
 
   plugin_data *pd=(plugin_data *)data;
+  alarm_t *alrm;
+  alrm = (alarm_t *) pd->selected->data;
 
 
   /* If paused, we resume */
-  if(pd->is_paused){
+  if(alrm->isPaused){
 	
-	g_timer_continue(pd->timer);
-	pd->is_paused=FALSE;
+	g_timer_continue(alrm->timer);
+	alrm->isPaused=FALSE;
 	
   /* If we're here then the timer is runnig, so we pause */	
   } else {
   
-  pd->is_paused=TRUE;
-  g_timer_stop(pd->timer);
+  alrm->isPaused=TRUE;
+  g_timer_stop(alrm->timer);
   
   }
   
@@ -431,15 +443,17 @@ static void pause_resume_selected (GtkWidget* menuitem, gpointer
 static void stop_repeating_alarm (GtkWidget* menuitem, gpointer
                                         data){
    plugin_data *pd=(plugin_data *)data;
+   alarm_t *alrm;
+   alrm = (alarm_t *) pd->selected->data;
+   
+   g_source_remove(alrm->repeat_timeout);
 
-   g_source_remove(pd->repeat_timeout);
+   alrm->isRepeating=FALSE;
 
-   pd->alarm_repeating=FALSE;
-
-   if(pd->timeout_command){
-    g_free(pd->timeout_command);
-    pd->timeout_command=NULL;
-   }
+//   if(pd->timeout_command){
+//    g_free(pd->timeout_command);
+//    pd->timeout_command=NULL;
+//   }
 
    //make_menu(pd);
 
@@ -483,23 +497,23 @@ void make_menu(plugin_data *pd){
   pd->menu=gtk_menu_new();
   
   /* If the alarm is paused, the only option is to resume or stop */
-  if (pd->is_paused) {
-      menuitem=gtk_menu_item_new_with_label(_("Resume timer"));
-
-      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
-      g_signal_connect  (G_OBJECT(menuitem),"activate",
-                G_CALLBACK(pause_resume_selected),pd);
-      gtk_widget_show(menuitem);
-      
-      menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
-
-      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
-      g_signal_connect  (G_OBJECT(menuitem),"activate",
-                G_CALLBACK(start_stop_selected),pd);
-      gtk_widget_show(menuitem);      
-      gtk_widget_show(pd->menu);
-      return;	  
-  }
+//  if (pd->is_paused) {
+//      menuitem=gtk_menu_item_new_with_label(_("Resume timer"));
+//
+//      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
+//      g_signal_connect  (G_OBJECT(menuitem),"activate",
+//                G_CALLBACK(pause_resume_selected),pd);
+//      gtk_widget_show(menuitem);
+//      
+//      menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
+//
+//      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
+//      g_signal_connect  (G_OBJECT(menuitem),"activate",
+//                G_CALLBACK(start_stop_selected),pd);
+//      gtk_widget_show(menuitem);      
+//      gtk_widget_show(pd->menu);
+//      return;	  
+//  }
 
   list = pd->alarm_list;
 
@@ -513,11 +527,12 @@ void make_menu(plugin_data *pd){
       menuitem=gtk_radio_menu_item_new_with_label(group,itemtext);      
       gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
       /* The selected timer is always active */
-      if(list == pd->selected)
-        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menuitem),TRUE);       
+      if(alrm->isActive){
+        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menuitem),TRUE);     
+      }
       /* others are disabled when timer or alarm is already running */
-      else if(pd->timer_on || pd->alarm_repeating)
-        gtk_widget_set_sensitive(GTK_WIDGET(menuitem),FALSE);
+//      else if(pd->timer_on || pd->alarm_repeating)
+//        gtk_widget_set_sensitive(GTK_WIDGET(menuitem),FALSE);
 
       group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (menuitem));
       g_signal_connect  (G_OBJECT(menuitem),"activate",
@@ -526,7 +541,6 @@ void make_menu(plugin_data *pd){
       g_free(itemtext);
 
       list = list->next;
- 
   }
 
   /* Horizontal line (empty item) */
@@ -534,36 +548,36 @@ void make_menu(plugin_data *pd){
   gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
 
   /* Pause menu item */
-  if(pd->timer_on && !pd->is_paused && pd->is_countdown) {
-    menuitem=gtk_menu_item_new_with_label(_("Pause timer"));
-
-    gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
-    g_signal_connect    (G_OBJECT(menuitem),"activate",
-            G_CALLBACK(pause_resume_selected),pd);
-
-
-  }
+//  if(pd->timer_on && !pd->is_paused && pd->is_countdown) {
+//    menuitem=gtk_menu_item_new_with_label(_("Pause timer"));
+//
+//    gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
+//    g_signal_connect    (G_OBJECT(menuitem),"activate",
+//            G_CALLBACK(pause_resume_selected),pd);
+//
+//
+//  }
  
   /* Start/stop menu item */
-  if(!pd->alarm_repeating){
-      if(pd->timer_on)
-        menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
-      else
-        menuitem=gtk_menu_item_new_with_label(_("Start timer"));
-
-      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
-      g_signal_connect  (G_OBJECT(menuitem),"activate",
-                G_CALLBACK(start_stop_selected),pd);
-  }
+//  if(!pd->alarm_repeating){
+//      if(pd->timer_on)
+//        menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
+//      else
+//        menuitem=gtk_menu_item_new_with_label(_("Start timer"));
+//
+//      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
+//      g_signal_connect  (G_OBJECT(menuitem),"activate",
+//                G_CALLBACK(start_stop_selected),pd);
+//  }
 
   /* Stop repeating alarm if so */
-  if(pd->alarm_repeating) {
-    menuitem=gtk_menu_item_new_with_label(_("Stop the alarm"));
-
-    gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
-    g_signal_connect    (G_OBJECT(menuitem),"activate",
-            G_CALLBACK(stop_repeating_alarm),pd);
-  }  
+//  if(pd->alarm_repeating) {
+//    menuitem=gtk_menu_item_new_with_label(_("Stop the alarm"));
+//
+//    gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
+//    g_signal_connect    (G_OBJECT(menuitem),"activate",
+//            G_CALLBACK(stop_repeating_alarm),pd);
+//  }  
 
   gtk_widget_show_all(pd->menu);
 }
@@ -588,7 +602,14 @@ static void ok_add(GtkButton *button, gpointer data){
   newalarm->iscountdown = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(adata->
                                     rb1));
   newalarm->pd = (gpointer) adata->pd;
-                                    
+  newalarm->isActive = FALSE;
+  newalarm->timeout = 0;
+  newalarm->timer = NULL;
+  newalarm->isPaused = FALSE;
+  newalarm->rem_repetitions = 1;
+  newalarm->isRepeating = FALSE;
+  newalarm->repeat_timeout = 0;
+  
   adata->pd->alarm_list = g_list_append (adata->pd->alarm_list, newalarm);
   if(g_list_length(adata->pd->alarm_list)==1)
      adata->pd->selected = adata->pd->alarm_list;
@@ -1082,10 +1103,10 @@ static void add_pbar(XfcePanelPlugin *plugin, plugin_data *pd){
   gdouble frac;
 
   //delete
-  GtkWidget *pbar2;
-  pbar2 = gtk_progress_bar_new ();
-  gtk_progress_bar_set_bar_style    (GTK_PROGRESS_BAR(pd->pbar),
-                    GTK_PROGRESS_CONTINUOUS);
+//  GtkWidget *pbar2;
+//  pbar2 = gtk_progress_bar_new ();
+//  gtk_progress_bar_set_bar_style    (GTK_PROGRESS_BAR(pd->pbar),
+//                    GTK_PROGRESS_CONTINUOUS);
   
   gtk_widget_hide(GTK_WIDGET(plugin));
 
@@ -1105,7 +1126,7 @@ static void add_pbar(XfcePanelPlugin *plugin, plugin_data *pd){
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),frac);
     
      //delete
-    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pbar2),frac);
+//    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pbar2),frac);
   }
   
   /* vertical bar */
@@ -1122,14 +1143,14 @@ static void add_pbar(XfcePanelPlugin *plugin, plugin_data *pd){
     gtk_widget_set_size_request(GTK_WIDGET(pd->pbar),PBAR_THICKNESS,0);
     
     //delete
-    gtk_progress_bar_set_orientation    (GTK_PROGRESS_BAR(pbar2),GTK_PROGRESS_BOTTOM_TO_TOP);
-    gtk_widget_set_size_request(GTK_WIDGET(pbar2),PBAR_THICKNESS,0);
+//    gtk_progress_bar_set_orientation    (GTK_PROGRESS_BAR(pbar2),GTK_PROGRESS_BOTTOM_TO_TOP);
+//    gtk_widget_set_size_request(GTK_WIDGET(pbar2),PBAR_THICKNESS,0);
     
     gtk_box_pack_start(GTK_BOX(pd->box),gtk_vseparator_new(),FALSE,FALSE,0);
     gtk_box_pack_start(GTK_BOX(pd->box),pd->pbar,FALSE,FALSE,0);
     
     //delete
-    gtk_box_pack_start(GTK_BOX(pd->box), pbar2,FALSE,FALSE,0);
+//    gtk_box_pack_start(GTK_BOX(pd->box), pbar2,FALSE,FALSE,0);
     
     gtk_box_pack_start(GTK_BOX(pd->box),gtk_vseparator_new(),FALSE,FALSE,0);
 
@@ -1248,7 +1269,7 @@ static void load_settings(plugin_data *pd)
             pd->global_command = g_strdup((gchar *)xfce_rc_read_entry
                (rc,"global_command",""));
                             
-            pd->repeat_alarm= xfce_rc_read_bool_entry
+            pd->repeat_alarm_command= xfce_rc_read_bool_entry
                 (rc,"repeat_alarm",FALSE);
             pd->repetitions= xfce_rc_read_int_entry
                 (rc,"repetitions",1);
@@ -1335,7 +1356,7 @@ static void save_settings(XfcePanelPlugin *plugin, plugin_data *pd){
   xfce_rc_write_bool_entry(rc,"selecting_starts",pd->selecting_starts);
   xfce_rc_write_bool_entry(rc,"use_global_command",pd->use_global_command);
   xfce_rc_write_entry(rc,"global_command",pd->global_command);
-  xfce_rc_write_bool_entry(rc,"repeat_alarm",pd->repeat_alarm);
+  xfce_rc_write_bool_entry(rc,"repeat_alarm",pd->repeat_alarm_command);
   xfce_rc_write_int_entry(rc,"repetitions",pd->repetitions);
   xfce_rc_write_int_entry(rc,"repeat_interval",pd->repeat_interval);
 
@@ -1379,20 +1400,28 @@ static void
 plugin_free (XfcePanelPlugin *plugin, plugin_data *pd)
 {
 
-  /* remove timeouts */
-  if (pd->timeout!=0) g_source_remove(pd->timeout);
-  if (pd->repeat_timeout!=0) g_source_remove(pd->repeat_timeout);
+    GList *list = NULL;
+    alarm_t *alrm;
+    list = pd->alarm_list;
 
-  /*save_settings(pd);*/
-
-  if(pd->timer)
-    g_timer_destroy(pd->timer);
-    
-  if(pd->active_timer_name)
-    g_free(pd->active_timer_name);
+    while (list){
+        alrm = (alarm_t *) list->data;
+        /* remove timeouts */
+        if (alrm->timeout!=0) g_source_remove(alrm->timeout);
+        if (alrm->repeat_timeout!=0) g_source_remove(alrm->repeat_timeout);
         
-  if(pd->timeout_command)
-    g_free(pd->timeout_command);
+        if(alrm->timer)
+            g_timer_destroy(alrm->timer);
+        
+        list = g_list_next (list);
+    }
+  
+    /*save_settings(pd);*/
+//  if(pd->active_timer_name)
+//    g_free(pd->active_timer_name);
+        
+//  if(pd->timeout_command)
+//    g_free(pd->timeout_command);
 
   if(pd->global_command)
     g_free(pd->global_command);
@@ -1495,9 +1524,9 @@ static void toggle_repeat_alarm(GtkToggleButton *button, gpointer data){
 
   plugin_data *pd=(plugin_data *)data;
 
-  pd->repeat_alarm = gtk_toggle_button_get_active(button);
+  pd->repeat_alarm_command = gtk_toggle_button_get_active(button);
 
-  gtk_widget_set_sensitive(pd->repeat_alarm_box,pd->repeat_alarm);
+  gtk_widget_set_sensitive(pd->repeat_alarm_box,pd->repeat_alarm_command);
 
 }
 
@@ -1699,7 +1728,7 @@ static void plugin_create_options (XfcePanelPlugin *plugin,plugin_data *pd) {
   
   /* Alarm repetitions config */  
   button=gtk_check_button_new_with_label(_("Repeat the alarm command"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),pd->repeat_alarm);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),pd->repeat_alarm_command);
   g_signal_connect(G_OBJECT(button),"toggled",G_CALLBACK(toggle_repeat_alarm),pd);
   gtk_box_pack_start(GTK_BOX(vbox),button,FALSE,FALSE,WIDGET_SPACING);
   
@@ -1719,7 +1748,7 @@ static void plugin_create_options (XfcePanelPlugin *plugin,plugin_data *pd) {
   g_signal_connect(G_OBJECT(spinbutton),"value-changed", G_CALLBACK(spin2_changed), pd);
 
   gtk_box_pack_start(GTK_BOX(vbox),hbox,FALSE,FALSE,WIDGET_SPACING);
-  gtk_widget_set_sensitive(hbox,pd->repeat_alarm);
+  gtk_widget_set_sensitive(hbox,pd->repeat_alarm_command);
 
 
 
@@ -1823,33 +1852,34 @@ static void create_plugin_control (XfcePanelPlugin *plugin)
   pd->eventbox = gtk_event_box_new();
 #endif  
   pd->box=NULL;
-  pd->timer_on=FALSE;
-  pd->timeout=0;
+//  pd->timer_on=FALSE;
+//  pd->timeout=0;
   pd->buttonadd=NULL;
   pd->buttonedit=NULL;
   pd->buttonremove=NULL;
   pd->menu=NULL;
   pd->tip=gtk_tooltips_new();
-  pd->timeout_command=NULL;
-  pd->timer=NULL;
-  pd->active_timer_name = g_strdup("");
+//  pd->timeout_command=NULL;
+//  pd->timer=NULL;
+//  pd->active_timer_name = g_strdup("");
   pd->nowin_if_alarm=FALSE;
   pd->selecting_starts=FALSE;
-  pd->repeat_alarm=FALSE;
-  pd->is_paused=FALSE;
-  pd->is_countdown=TRUE;
+  pd->repeat_alarm_command=FALSE;
+//  pd->is_paused=FALSE;
+//  pd->is_countdown=TRUE;
   pd->use_global_command = FALSE;
   pd->glob_command_entry = NULL;
   pd->global_command = g_strdup(""); /* For Gtk >= 3.4 one could just set = NULL */
   pd->global_command_box = NULL;  
   pd->repeat_alarm_box=NULL;
   pd->repetitions=1;
-  pd->rem_repetitions=1;
+//  pd->rem_repetitions=1;
   pd->repeat_interval=10;
-  pd->alarm_repeating=FALSE;
-  pd->repeat_timeout=0;
+//  pd->alarm_repeating=FALSE;
+//  pd->repeat_timeout=0;
   pd->alarm_list = NULL;
   pd->selected=NULL;
+  pd->num_active_timers=0;
   
   gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(plugin), "", NULL);
   gtk_tooltips_disable(pd->tip);

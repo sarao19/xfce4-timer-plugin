@@ -21,9 +21,12 @@ typedef struct {
 
   gchar *name,*command,*info;
   gint  time;
-  gboolean iscountdown, isRecurring, autoStart;
+  gboolean iscountdown, isRecurring, autoStart, isActive, isPaused, isRepeating;
   gpointer pd;
-  
+  gint timeout_period_in_sec,    /* Active countdown period */
+          rem_repetitions;      /* Remaining repeats */
+  guint timeout,repeat_timeout;	/* The timeout IDs */
+  GTimer *timer;	
 } alarm_t;
 
 typedef struct {
@@ -46,35 +49,34 @@ typedef struct {
   XfcePanelPlugin *base;			/* The plugin widget */
   GtkListStore *liststore;				/* The alarms list */
   gint 		count,
-			timeout_period_in_sec,	/* Active countdown period */
+//			timeout_period_in_sec,	/* Active countdown period */
 			repetitions,			/* Number of alarm repeats */
-			rem_repetitions,		/* Remaining repeats */
+//			rem_repetitions,		/* Remaining repeats */
 			repeat_interval;		/* Time interval between
 									repeats (in secs) */
-  guint 	timeout,repeat_timeout;	/* The timeout IDs */
-  gboolean 	timer_on,				/* TRUE if countdown 
-									is in progress */							   
+//  guint 	timeout,repeat_timeout;	/* The timeout IDs */
+//  gboolean 	timer_on,				/* TRUE if countdown is in progress */		
+  gboolean
 			nowin_if_alarm,			/* Show warning window when
 									alarm command is set */
 			selecting_starts,       /* selecting a timer also starts it */							   
-			repeat_alarm,			/* Repeat alarm */
-			use_global_command,		/* Use a default alarm command
-									if no alarm command is set */
-			alarm_repeating,		/* True while alarm repeats */
-			is_paused,				/* True if the countdown is paused */
-			is_countdown;			/* True if the alarm type is contdown */
+			repeat_alarm_command,			/* Repeat alarm */
+			use_global_command;		/* Use a default alarm command if no alarm command is set */
+//			alarm_repeating,		/* True while alarm repeats */
+//			is_paused,				/* True if the countdown is paused */
+//			is_countdown;			/* True if the alarm type is contdown */
   GtkTooltips 	*tip;				/* Tooltip for panel */
-  gchar 	*timeout_command,	/* Command when countdown ends */
-			*global_command,	/* The global (default) command to be
+//  gchar 	*timeout_command,	/* Command when countdown ends */
+    gchar			*global_command,	/* The global (default) command to be
 								run when countdown ends */
-			*active_timer_name, /* Name of the timer running */
+//			*active_timer_name, /* Name of the timer running */
   			*configfile;		/* Full address of the permanent
   								config file -- this is not the
   								plugin rc file. */
-  GTimer 	*timer;				/* Keeps track of the time elapsed */
+//  GTimer 	*timer;				/* Keeps track of the time elapsed */
   GList		*alarm_list,		/* List of alarms */
   			*selected;			/* Selected alarm */
-  guint     numStartedAlarms;
+  guint     num_active_timers;
 
 } plugin_data;
 

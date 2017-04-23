@@ -27,6 +27,9 @@
         <dependencyChecking>false</dependencyChecking>
         <rebuildPropChanged>false</rebuildPropChanged>
       </toolsSet>
+      <flagsDictionary>
+        <element flagsID="0" commonFlags="-g -O2"/>
+      </flagsDictionary>
       <codeAssistance>
       </codeAssistance>
       <makefileType>
@@ -58,7 +61,7 @@
             </incDir>
             <preprocessorList>
               <Elem>HAVE_CONFIG_H</Elem>
-              <Elem>PACKAGE_LOCALE_DIR="/usr/local/share/locale"</Elem>
+              <Elem>PACKAGE_LOCALE_DIR="/usr/share/locale"</Elem>
             </preprocessorList>
           </cTool>
         </makeTool>
@@ -68,6 +71,8 @@
         </preBuild>
       </makefileType>
       <item path="src/xfcetimer.c" ex="false" tool="0" flavor2="0">
+        <cTool flags="0">
+        </cTool>
       </item>
     </conf>
   </confs>
