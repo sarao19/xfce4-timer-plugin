@@ -1,0 +1,2 @@
+	../src/xfcetimer.c \
+	../src/xfce4-timer.desktop.in.in

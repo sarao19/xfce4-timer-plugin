@@ -671,6 +671,12 @@ static void ok_edit(GtkButton *button, gpointer data){
 	 alrm->command = g_strdup(gtk_entry_get_text(GTK_ENTRY(adata->command)));
 	 alrm->iscountdown = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(adata->
                                     rb1));
+         
+         alrm->isRecurring = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(adata->
+                                    recur_cb));
+         alrm->autoStart = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(adata->
+                                    autostart_cb));
+         
 	 /* This should be unnecessary, but do it anyway */
 	 alrm->pd = (gpointer) adata->pd;
 	 
@@ -862,6 +868,19 @@ static void add_edit_clicked (GtkButton *buttonn, gpointer data){
 
   /****************/
 
+  //add recurring alarm check button
+  button=gtk_check_button_new_with_label("recurring alarm");
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),FALSE);
+  adata->recur_cb=button;
+  gtk_box_pack_start(GTK_BOX(vbox),button,FALSE,FALSE,WIDGET_SPACING);
+  
+  
+   //add alarm autostart check button
+  button=gtk_check_button_new_with_label("autostart");
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),FALSE);
+  adata->autostart_cb=button;
+  gtk_box_pack_start(GTK_BOX(vbox),button,FALSE,FALSE,WIDGET_SPACING);
+
   //hbox=gtk_hbox_new(TRUE,0);
   hbox = gtk_hbutton_box_new();
   gtk_button_box_set_layout(GTK_BUTTON_BOX(hbox), GTK_BUTTONBOX_END);
@@ -902,6 +921,10 @@ static void add_edit_clicked (GtkButton *buttonn, gpointer data){
       gtk_entry_set_text(GTK_ENTRY(name),alrm->name);
       gtk_entry_set_text(GTK_ENTRY(command),alrm->command);
       
+       //load settings
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(adata->recur_cb),alrm->isRecurring);
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(adata->autostart_cb),alrm->autoStart);
+
       time = alrm->time;
 
       if(alrm->iscountdown){
@@ -1058,6 +1081,12 @@ static void add_pbar(XfcePanelPlugin *plugin, plugin_data *pd){
 
   gdouble frac;
 
+  //delete
+  GtkWidget *pbar2;
+  pbar2 = gtk_progress_bar_new ();
+  gtk_progress_bar_set_bar_style    (GTK_PROGRESS_BAR(pd->pbar),
+                    GTK_PROGRESS_CONTINUOUS);
+  
   gtk_widget_hide(GTK_WIDGET(plugin));
 
   /* Always true except at initialization */
@@ -1074,6 +1103,9 @@ static void add_pbar(XfcePanelPlugin *plugin, plugin_data *pd){
     gtk_progress_bar_set_bar_style    (GTK_PROGRESS_BAR(pd->pbar),
                     GTK_PROGRESS_CONTINUOUS);
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),frac);
+    
+     //delete
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pbar2),frac);
   }
   
   /* vertical bar */
@@ -1088,8 +1120,17 @@ static void add_pbar(XfcePanelPlugin *plugin, plugin_data *pd){
     gtk_progress_bar_set_orientation    (GTK_PROGRESS_BAR(pd->
                     pbar),GTK_PROGRESS_BOTTOM_TO_TOP);
     gtk_widget_set_size_request(GTK_WIDGET(pd->pbar),PBAR_THICKNESS,0);
+    
+    //delete
+    gtk_progress_bar_set_orientation    (GTK_PROGRESS_BAR(pbar2),GTK_PROGRESS_BOTTOM_TO_TOP);
+    gtk_widget_set_size_request(GTK_WIDGET(pbar2),PBAR_THICKNESS,0);
+    
     gtk_box_pack_start(GTK_BOX(pd->box),gtk_vseparator_new(),FALSE,FALSE,0);
     gtk_box_pack_start(GTK_BOX(pd->box),pd->pbar,FALSE,FALSE,0);
+    
+    //delete
+    gtk_box_pack_start(GTK_BOX(pd->box), pbar2,FALSE,FALSE,0);
+    
     gtk_box_pack_start(GTK_BOX(pd->box),gtk_vseparator_new(),FALSE,FALSE,0);
 
   }
@@ -1132,7 +1173,8 @@ static void load_settings(plugin_data *pd)
   gchar groupname[8];
   const gchar *timerstring;
   gint groupnum,time;
-  gboolean is_cd;
+  
+  gboolean is_cd, is_recur, autostart;
   alarm_t *alrm;
   
   XfceRc *rc;
@@ -1171,6 +1213,12 @@ static void load_settings(plugin_data *pd)
 
              is_cd=xfce_rc_read_bool_entry(rc,"is_countdown",TRUE);
              alrm->iscountdown = is_cd;
+             
+             is_recur=xfce_rc_read_bool_entry(rc,"is_recur",FALSE);
+             alrm->isRecurring = is_recur;
+             
+             autostart=xfce_rc_read_bool_entry(rc,"autostart",FALSE);
+             alrm->autoStart = autostart;
              
              time=xfce_rc_read_int_entry(rc,"time",0);
 			 alrm->time = time;
@@ -1270,6 +1318,10 @@ static void save_settings(XfcePanelPlugin *plugin, plugin_data *pd){
       xfce_rc_write_entry(rc,"timerinfo",alrm->info);
 
       xfce_rc_write_bool_entry(rc,"is_countdown",alrm->iscountdown);
+
+      xfce_rc_write_bool_entry(rc,"is_recur",alrm->isRecurring);
+      
+      xfce_rc_write_bool_entry(rc,"autostart",alrm->autoStart);
 
       row_count ++;
       list = list->next;

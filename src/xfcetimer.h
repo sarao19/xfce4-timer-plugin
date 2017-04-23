@@ -21,7 +21,7 @@ typedef struct {
 
   gchar *name,*command,*info;
   gint  time;
-  gboolean iscountdown;
+  gboolean iscountdown, isRecurring, autoStart;
   gpointer pd;
   
 } alarm_t;
@@ -74,6 +74,7 @@ typedef struct {
   GTimer 	*timer;				/* Keeps track of the time elapsed */
   GList		*alarm_list,		/* List of alarms */
   			*selected;			/* Selected alarm */
+  guint     numStartedAlarms;
 
 } plugin_data;
 
@@ -84,6 +85,7 @@ typedef struct {
   GtkEntry 	*name,*command;				/* Name, and command entries */
   GtkRadioButton *rb1;					/* Radio button for the
 							   h-m-s format */
+  GtkWidget *recur_cb, *autostart_cb;              /* check buttons for recurring alarm, autostart */
   GtkWindow 	*window;				/* Add/Edit window */
   plugin_data 	*pd;					/* Plugin data */
 } alarm_data;
