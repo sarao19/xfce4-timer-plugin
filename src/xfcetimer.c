@@ -181,77 +181,76 @@ static gboolean update_function (gpointer data){
               g_free(tiptext);
               
               callAgain =  TRUE;
-              continue;
-          }
-          
-          /* Countdown is over, stop timer and free resources */
-          if (alrm->timer)
-              g_timer_destroy(alrm->timer);
-          alrm->timer = NULL;
-          
-          /* Disable tooltips, reset pbar */
-          gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), "", NULL);
-          gtk_tooltips_disable(pd->tip);
-          gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 0);
-          
-          alrm->timeout = 0;
-          
-          alrm->isActive = FALSE;
-          
-          gchar *command;
-          
-          /* If an alarm command is set, it overrides the default (if any) */
-          if (strlen(alrm->command)>0)
-              command = g_strdup(alrm->command);
-          else if (pd->use_global_command)
-              command = g_strdup (pd->global_command);
-          else
-              command = g_strdup("");
-          
-          
-          if ((strlen(command) == 0) || !pd->nowin_if_alarm) {
-              gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 1);
+          }else{
               
-              /* Display the name of the alarm when the countdown ends */
-              dialog_message = g_strdup_printf(_("Beeep! :) \nTime is up for the alarm %s."), alrm->name);
-              dialog_title = g_strdup_printf("Xfce4 Timer Plugin: %s", alrm->name);
+              /* Countdown is over, stop timer and free resources */
+              if (alrm->timer)
+                  g_timer_destroy(alrm->timer);
+              alrm->timer = NULL;
               
-              dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL,
-                      GTK_MESSAGE_WARNING,
-                      GTK_BUTTONS_NONE, dialog_message);
+              /* Disable tooltips, reset pbar */
+              gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), "", NULL);
+              gtk_tooltips_disable(pd->tip);
+              gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 0);
               
-              gtk_window_set_title((GtkWindow *) dialog, dialog_title);
+              alrm->timeout = 0;
               
-              gtk_dialog_add_button((GtkDialog *) dialog, GTK_STOCK_CLOSE, 0);
-              gtk_dialog_add_button((GtkDialog *) dialog, _("Rerun the timer"), 1);
+              alrm->isActive = FALSE;
               
-              g_signal_connect(dialog, "response",
-                      G_CALLBACK(dialog_response),
-                      pd);
+              gchar *command;
               
-              g_free(dialog_title);
-              g_free(dialog_message);
+              /* If an alarm command is set, it overrides the default (if any) */
+              if (strlen(alrm->command)>0)
+                  command = g_strdup(alrm->command);
+              else if (pd->use_global_command)
+                  command = g_strdup (pd->global_command);
+              else
+                  command = g_strdup("");
               
-              gtk_widget_show(dialog);
-          }
-          
-          if (strlen(command) > 0) {
               
-              g_spawn_command_line_async(command, NULL);
+              if ((strlen(command) == 0) || !pd->nowin_if_alarm) {
+                  gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar), 1);
+                  
+                  /* Display the name of the alarm when the countdown ends */
+                  dialog_message = g_strdup_printf(_("Beeep! :) \nTime is up for the alarm %s."), alrm->name);
+                  dialog_title = g_strdup_printf("Xfce4 Timer Plugin: %s", alrm->name);
+                  
+                  dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL,
+                          GTK_MESSAGE_WARNING,
+                          GTK_BUTTONS_NONE, dialog_message);
+                  
+                  gtk_window_set_title((GtkWindow *) dialog, dialog_title);
+                  
+                  gtk_dialog_add_button((GtkDialog *) dialog, GTK_STOCK_CLOSE, 0);
+                  gtk_dialog_add_button((GtkDialog *) dialog, _("Rerun the timer"), 1);
+                  
+                  g_signal_connect(dialog, "response",
+                          G_CALLBACK(dialog_response),
+                          pd);
+                  
+                  g_free(dialog_title);
+                  g_free(dialog_message);
+                  
+                  gtk_widget_show(dialog);
+              }
               
-              if (pd->repeat_alarm_command) {
-                  alrm->isRepeating = TRUE;
-                  alrm->rem_repetitions = pd->repetitions;
-                  if (alrm->repeat_timeout != 0)
-                      g_source_remove(alrm->repeat_timeout);
-                  alrm->repeat_timeout = g_timeout_add(pd->repeat_interval * 1000, repeat_alarm, alrm);
-              } else {
-                  if (command)
-                      g_free(command);
-                  command = NULL;
+              if (strlen(command) > 0) {
+                  
+                  g_spawn_command_line_async(command, NULL);
+                  
+                  if (pd->repeat_alarm_command) {
+                      alrm->isRepeating = TRUE;
+                      alrm->rem_repetitions = pd->repetitions;
+                      if (alrm->repeat_timeout != 0)
+                          g_source_remove(alrm->repeat_timeout);
+                      alrm->repeat_timeout = g_timeout_add(pd->repeat_interval * 1000, repeat_alarm, alrm);
+                  } else {
+                      if (command)
+                          g_free(command);
+                      command = NULL;
+                  }
               }
           }
-          
       }
       
       list = g_list_next (list);
