@@ -50,10 +50,10 @@
 
 static void create_plugin_control (XfcePanelPlugin *plugin);
 
-static void start_timer (plugin_data *pd);
+static void start_timer (plugin_data *pd, alarm_t* alrm);
 
 static void
-dialog_response (GtkWidget *dlg, int response, plugin_data *pd);
+dialog_response (GtkWidget *dlg, int response, gpointer list);
                                         
 static void start_stop_selected (GtkWidget* menuitem, gpointer
                                         data);
@@ -232,7 +232,7 @@ static gboolean update_function (gpointer data){
                   
                   g_signal_connect(dialog, "response",
                           G_CALLBACK(dialog_response),
-                          pd);
+                          list);
                   
                   g_free(dialog_title);
                   g_free(dialog_message);
@@ -305,7 +305,7 @@ static void timer_selected (GtkWidget* menuitem, gpointer data){
  * that the timer is already stopped.
 **/
 
-static void start_timer (plugin_data *pd){
+static void start_timer (plugin_data *pd, alarm_t* alrm){
 
   GSList *group=NULL;
   gchar temp[8];
@@ -314,13 +314,13 @@ static void start_timer (plugin_data *pd){
   gboolean is_cd;
   GTimeVal timeval;
   struct tm *current;
-  alarm_t *alrm;
+//  alarm_t *alrm;
 
   /* Empty timer list-> Nothing to do. pd->selected=0, though. */
-  if(pd->selected == NULL)
+  if(alrm == NULL)
     return;
 
-  alrm = (alarm_t *) pd->selected->data;
+//  alrm = (alarm_t *) pd->selected->data;
   
   /* If it's a 24h type alarm, we find the difference with current time
      Here 'time' is in minutes */
@@ -415,7 +415,7 @@ static void start_stop_selected (GtkWidget* menuitem, gpointer
 
   /* If we're here then the timer is off, so we start it */
 
-  start_timer(pd);
+  start_timer(pd, alrm);
 
 }
 
@@ -1480,15 +1480,20 @@ options_dialog_response (GtkWidget *dlg, int reponse, plugin_data *pd)
 /*  Alarm dialog response  */
 /***************************/
 static void
-dialog_response (GtkWidget *dlg, int response, plugin_data *pd)
+dialog_response (GtkWidget *dlg, int response, gpointer list)
 {
-	
+    GList *listitem = (GList *) list;
+    plugin_data *pd;
+    alarm_t *alrm;
+    alrm = (alarm_t *) listitem->data;
+    pd = (plugin_data *) alrm->pd;
+  
 	if (response!=1) {
 		gtk_widget_destroy(dlg);
 		return;
 	}
 	
-	start_timer(pd);
+	start_timer(pd, alrm);
 	gtk_widget_destroy(dlg);
 	
 }
