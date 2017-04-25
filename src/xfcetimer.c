@@ -503,17 +503,11 @@ void make_menu(plugin_data *pd){
   while (list){
 
       /* Run through the list, read name and timer period info */
-
       alrm = (alarm_t *) list->data;
-
       itemtext = g_strdup_printf("%s (%s)",alrm->name,alrm->info);
       
       /* The selected timer is always active */
       if(alrm->isActive){
-          /* Horizontal line (empty item) */
-          menuitem=gtk_menu_item_new();
-          gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
-          
           menuitem=gtk_menu_item_new_with_label(itemtext);       
           gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
           gtk_widget_set_sensitive(GTK_WIDGET(menuitem),FALSE);
@@ -547,9 +541,6 @@ void make_menu(plugin_data *pd){
           g_signal_connect  (G_OBJECT(menuitem),"activate",
                   G_CALLBACK(start_stop_selected),list);
           
-          menuitem=gtk_menu_item_new();
-          gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
-          
       }else{
           menuitem=gtk_menu_item_new_with_label(itemtext);       
           gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
@@ -563,6 +554,12 @@ void make_menu(plugin_data *pd){
       g_free(itemtext);
 
       list = list->next;
+      
+      if(list){
+          /* Horizontal line (empty item) */
+          menuitem=gtk_menu_item_new();
+          gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
+      }
   }
 
   /* Start/stop menu item */
