@@ -141,6 +141,8 @@ static gboolean update_function (gpointer data){
 
   plugin_data *pd=(plugin_data *)data;
   gint elapsed_sec,remaining;
+  //for showing the progress of the first to finish
+  gint min_remaining_time = G_MAXINT;
   gchar *tiptext = NULL, *temp, *dialog_title, *dialog_message;
   GtkWidget *dialog;
   GList *list = NULL;
@@ -173,12 +175,16 @@ static gboolean update_function (gpointer data){
                   g_free(tiptext);
                   tiptext = temp;
               }
-              gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),
-                      1.0 - ((gdouble) elapsed_sec) / alrm->timeout_period_in_sec);
               
-              gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), tiptext, NULL);
-              
-              g_free(tiptext);
+              if(alrm->timeout_period_in_sec < min_remaining_time){
+                  min_remaining_time = alrm->timeout_period_in_sec;
+                  gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),
+                          1.0 - ((gdouble) elapsed_sec) / alrm->timeout_period_in_sec);
+                  
+                  gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), tiptext, NULL);
+                  
+                  g_free(tiptext);
+              }
               
               callAgain =  TRUE;
           }else{
