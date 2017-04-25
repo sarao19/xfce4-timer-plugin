@@ -290,7 +290,7 @@ static void timer_selected (GtkWidget* menuitem, gpointer data){
 
   /* start the timer if the option to do so on selecting is set */
   if(pd->selecting_starts)// && !pd->timer_on)  //no need to check because timers should be concurrent
-    start_stop_selected(menuitem,pd);  
+    start_stop_selected(menuitem,list);  
 
 }
 
@@ -362,9 +362,10 @@ static void start_timer (plugin_data *pd){
 **/
 
 static void start_stop_selected (GtkWidget* menuitem, gpointer
-                                        plugindata){
+                                        list){
 
-  plugin_data *pd=(plugin_data *)plugindata;
+  GList *listitem = (GList *) list;
+  plugin_data *pd;
   GSList *group=NULL;
   gchar temp[8];
   gint row_count,cur_h,cur_m,cur_s,time;
@@ -373,7 +374,9 @@ static void start_stop_selected (GtkWidget* menuitem, gpointer
   GTimeVal timeval;
   struct tm *current;
   alarm_t *alrm;
-  alrm = (alarm_t *) pd->selected->data;
+  
+  alrm = (alarm_t *) listitem->data;
+  pd = (plugin_data *) alrm->pd;
   
   /* If timer is active destroy it*/
   if(alrm->isActive){
@@ -534,20 +537,15 @@ void make_menu(plugin_data *pd){
                       G_CALLBACK(pause_resume_selected),pd);
               gtk_widget_show(menuitem);
               
-              menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
-              
-              gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
-              g_signal_connect  (G_OBJECT(menuitem),"activate",
-                      G_CALLBACK(start_stop_selected),pd);
               gtk_widget_show(menuitem);      
               gtk_widget_show(pd->menu);
           }
           
-          menuitem=gtk_menu_item_new_with_label(_("Stop the alarm"));
-          
-          gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
-          g_signal_connect    (G_OBJECT(menuitem),"activate",
-                  G_CALLBACK(stop_repeating_alarm),pd);
+          menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
+              
+          gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
+          g_signal_connect  (G_OBJECT(menuitem),"activate",
+                  G_CALLBACK(start_stop_selected),list);
           
           menuitem=gtk_menu_item_new();
           gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
