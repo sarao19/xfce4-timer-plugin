@@ -266,12 +266,13 @@ static gboolean update_function (gpointer data){
 
 //static void timer_selected (GtkWidget* menuitem, GdkEventButton *event, gpointer data){
 static void timer_selected (GtkWidget* menuitem, gpointer data){
+    fprintf( stderr, "%s\n", "timer_selected");
   GList *list = (GList *) data;
   alarm_t *alrm;
   plugin_data *pd;
-  GtkRadioMenuItem *rmi;
+  GtkMenuItem *rmi;
 
-  rmi = (GtkRadioMenuItem *) menuitem;
+  rmi = (GtkMenuItem *) menuitem;
 
   // We do this to get rid of the (irrelevant) "activate" signals
   // emitted by the first radio check button in the pop-up
@@ -279,8 +280,8 @@ static void timer_selected (GtkWidget* menuitem, gpointer data){
   // previous selection when a new selection is made. Another workaround
   // is to listen to the button_press_event but it does not capture
   // the Enter key press on the menuitem.  
-  if(!gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(rmi)))
-  	return;
+//  if(!gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(rmi)))
+//  	return;
   
   alrm = (alarm_t *) list->data;
   pd = (plugin_data *) alrm->pd;
@@ -482,7 +483,6 @@ static void pbar_clicked (GtkWidget *pbar, GdkEventButton *event, gpointer data)
 **/
 void make_menu(plugin_data *pd){
 
-  GSList *group = NULL;
   GList *list = NULL;
   alarm_t *alrm;
   GtkWidget *menuitem, *to_be_activated;
@@ -495,68 +495,78 @@ void make_menu(plugin_data *pd){
 
   pd->menu=gtk_menu_new();
   
-  /* If the alarm is paused, the only option is to resume or stop */
-//  if (pd->is_paused) {
-//      menuitem=gtk_menu_item_new_with_label(_("Resume timer"));
-//
-//      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
-//      g_signal_connect  (G_OBJECT(menuitem),"activate",
-//                G_CALLBACK(pause_resume_selected),pd);
-//      gtk_widget_show(menuitem);
-//      
-//      menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
-//
-//      gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
-//      g_signal_connect  (G_OBJECT(menuitem),"activate",
-//                G_CALLBACK(start_stop_selected),pd);
-//      gtk_widget_show(menuitem);      
-//      gtk_widget_show(pd->menu);
-//      return;	  
-//  }
-
   list = pd->alarm_list;
 
   while (list){
 
       /* Run through the list, read name and timer period info */
 
-	  alrm = (alarm_t *) list->data;
+      alrm = (alarm_t *) list->data;
 
       itemtext = g_strdup_printf("%s (%s)",alrm->name,alrm->info);
-      menuitem=gtk_radio_menu_item_new_with_label(group,itemtext);      
-      gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
+      
       /* The selected timer is always active */
       if(alrm->isActive){
-        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menuitem),TRUE);     
-      }
-      /* others are disabled when timer or alarm is already running */
-//      else if(pd->timer_on || pd->alarm_repeating)
-//        gtk_widget_set_sensitive(GTK_WIDGET(menuitem),FALSE);
-
-      group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (menuitem));
-      g_signal_connect  (G_OBJECT(menuitem),"activate",
+          /* Horizontal line (empty item) */
+          menuitem=gtk_menu_item_new();
+          gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
+          
+          menuitem=gtk_menu_item_new_with_label(itemtext);       
+          gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
+          gtk_widget_set_sensitive(GTK_WIDGET(menuitem),FALSE);
+          
+          gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menuitem),TRUE);
+          
+          /* Pause menu item */
+          if(!alrm->isPaused && alrm->iscountdown) {
+              menuitem=gtk_menu_item_new_with_label(_("Pause timer"));
+              
+              gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
+              g_signal_connect    (G_OBJECT(menuitem),"activate",
+                      G_CALLBACK(pause_resume_selected),pd);
+          }
+          /* If the alarm is paused, the only option is to resume or stop */
+          else if (alrm->isPaused) {
+              menuitem=gtk_menu_item_new_with_label(_("Resume timer"));
+              
+              gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
+              g_signal_connect  (G_OBJECT(menuitem),"activate",
+                      G_CALLBACK(pause_resume_selected),pd);
+              gtk_widget_show(menuitem);
+              
+              menuitem=gtk_menu_item_new_with_label(_("Stop timer"));
+              
+              gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
+              g_signal_connect  (G_OBJECT(menuitem),"activate",
+                      G_CALLBACK(start_stop_selected),pd);
+              gtk_widget_show(menuitem);      
+              gtk_widget_show(pd->menu);
+          }
+          
+          menuitem=gtk_menu_item_new_with_label(_("Stop the alarm"));
+          
+          gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
+          g_signal_connect    (G_OBJECT(menuitem),"activate",
+                  G_CALLBACK(stop_repeating_alarm),pd);
+          
+          menuitem=gtk_menu_item_new();
+          gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
+          
+      }else{
+          menuitem=gtk_menu_item_new_with_label(itemtext);       
+          gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
+          g_signal_connect  (G_OBJECT(menuitem),"activate",
             G_CALLBACK(timer_selected),list);
+          /* disable alarm menu entry if repeating command */
+          if(alrm->isRepeating)
+              gtk_widget_set_sensitive(GTK_WIDGET(menuitem),FALSE);
+      }
             
       g_free(itemtext);
 
       list = list->next;
   }
 
-  /* Horizontal line (empty item) */
-  menuitem=gtk_menu_item_new();
-  gtk_menu_shell_append(GTK_MENU_SHELL(pd->menu),menuitem);
-
-  /* Pause menu item */
-//  if(pd->timer_on && !pd->is_paused && pd->is_countdown) {
-//    menuitem=gtk_menu_item_new_with_label(_("Pause timer"));
-//
-//    gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
-//    g_signal_connect    (G_OBJECT(menuitem),"activate",
-//            G_CALLBACK(pause_resume_selected),pd);
-//
-//
-//  }
- 
   /* Start/stop menu item */
 //  if(!pd->alarm_repeating){
 //      if(pd->timer_on)
@@ -1906,7 +1916,7 @@ static void create_plugin_control (XfcePanelPlugin *plugin)
   xfce_panel_plugin_set_expand(plugin,FALSE);
 
 #ifdef HAVE_XFCE48
-  g_signal_connect  (G_OBJECT(plugin), "button_press_event",
+  g_signal_connect  (G_OBJECT(plugin), "button_release_event",
             G_CALLBACK(pbar_clicked), pd);   
 #else
   gtk_container_add(GTK_CONTAINER(plugin),pd->eventbox);
