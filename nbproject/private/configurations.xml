@@ -13,6 +13,8 @@
       <df name="src">
         <df name=".deps">
         </df>
+        <df name=".libs">
+        </df>
         <in>xfcetimer.c</in>
         <in>xfcetimer.h</in>
       </df>

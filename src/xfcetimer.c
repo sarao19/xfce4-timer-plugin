@@ -53,7 +53,7 @@ static void create_plugin_control (XfcePanelPlugin *plugin);
 static void start_timer (plugin_data *pd, alarm_t* alrm);
 
 static void
-dialog_response (GtkWidget *dlg, int response, gpointer list);
+dialog_response (GtkWidget *dlg, int response, alarm_t* alrm);
                                         
 static void start_stop_selected (GtkWidget* menuitem, gpointer
                                         data);
@@ -232,7 +232,7 @@ static gboolean update_function (gpointer data){
                   
                   g_signal_connect(dialog, "response",
                           G_CALLBACK(dialog_response),
-                          list);
+                          alrm);
                   
                   g_free(dialog_title);
                   g_free(dialog_message);
@@ -1480,12 +1480,12 @@ options_dialog_response (GtkWidget *dlg, int reponse, plugin_data *pd)
 /*  Alarm dialog response  */
 /***************************/
 static void
-dialog_response (GtkWidget *dlg, int response, gpointer list)
+dialog_response (GtkWidget *dlg, int response, alarm_t* alrm)
 {
-    GList *listitem = (GList *) list;
+//    GList *listitem = (GList *) list;
     plugin_data *pd;
-    alarm_t *alrm;
-    alrm = (alarm_t *) listitem->data;
+//    alarm_t *alrm;
+//    alrm = (alarm_t *) listitem->data;
     pd = (plugin_data *) alrm->pd;
   
 	if (response!=1) {
