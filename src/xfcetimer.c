@@ -256,6 +256,11 @@ static gboolean update_function (gpointer data){
                       command = NULL;
                   }
               }
+     
+              //Check if alarm is recurring after it's finished and destroyed; if yes then start it again.  
+              if(alrm->isRecurring){
+                      start_timer(pd,alrm);
+              }
           }
       }
       
@@ -1849,6 +1854,8 @@ static void create_plugin_control (XfcePanelPlugin *plugin)
   GtkTooltips *tooltip;
   char command[1024];
   gchar *filename,*pathname;
+  GList *list = NULL;
+  alarm_t *alrm;
 
   xfce_textdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR, "UTF-8");
 
@@ -1910,6 +1917,16 @@ static void create_plugin_control (XfcePanelPlugin *plugin)
 
   load_settings(pd);
   pd->selected = pd->alarm_list;
+  
+  //Check if an alarm is autoStart to start it at creation 
+  list = pd->alarm_list;
+  while (list){
+      alrm = (alarm_t *) list->data;
+      if(alrm->autoStart){
+          start_timer(pd,alrm);
+      }
+      list = g_list_next (list);
+  }
       
   gtk_progress_bar_set_bar_style    (GTK_PROGRESS_BAR(pd->pbar),
                     GTK_PROGRESS_CONTINUOUS);
@@ -1946,7 +1963,8 @@ static void create_plugin_control (XfcePanelPlugin *plugin)
                       G_CALLBACK (plugin_create_options), pd);
 
   xfce_panel_plugin_menu_show_about(plugin);
-  g_signal_connect (plugin, "about", G_CALLBACK (show_about_window), pd);                      
+  g_signal_connect (plugin, "about", G_CALLBACK (show_about_window), pd); 
+  
                    
 }
 
