@@ -144,11 +144,13 @@ static gboolean update_function (gpointer data){
   //for showing the progress of the first to finish
   gint min_remaining_time = G_MAXINT;
   gchar *tiptext = NULL, *temp, *dialog_title, *dialog_message;
+  gchar *finalTipText = "";
   GtkWidget *dialog;
   GList *list = NULL;
   alarm_t *alrm;
   gboolean callAgain = FALSE;
-
+  gboolean firstActiveTimer = TRUE;
+  
   list = pd->alarm_list;
 
   while (list){
@@ -181,9 +183,9 @@ static gboolean update_function (gpointer data){
                   gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(pd->pbar),
                           1.0 - ((gdouble) elapsed_sec) / alrm->timeout_period_in_sec);
                   
-                  gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), tiptext, NULL);
-                  
-                  g_free(tiptext);
+//                  gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), tiptext, NULL);
+//                  
+//                  g_free(tiptext);
               }
               
               callAgain =  TRUE;
@@ -262,10 +264,26 @@ static gboolean update_function (gpointer data){
                       start_timer(pd,alrm);
               }
           }
+          
+          tiptext = g_strconcat("\t", tiptext, NULL);
+          tiptext = g_strconcat(alrm->name , tiptext, NULL);
+          //if not first
+          if(firstActiveTimer){
+              firstActiveTimer = FALSE;
+          }else{
+              tiptext = g_strconcat("\n", tiptext, NULL);
+          }
+          
+          finalTipText = g_strconcat(finalTipText, tiptext, NULL);
+//          finalTipText = g_strconcat(finalTipText, "\n", NULL);
       }
-      
       list = g_list_next (list);
   }
+  
+  gtk_tooltips_set_tip(pd->tip, GTK_WIDGET(pd->base), finalTipText, NULL);
+  
+  g_free(tiptext);
+  g_free(finalTipText);
   
   return callAgain;
 }
