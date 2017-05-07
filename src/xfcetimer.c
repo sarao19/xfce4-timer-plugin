@@ -427,14 +427,14 @@ static void start_stop_selected (GtkWidget* menuitem, gpointer
 static void pause_resume_selected (GtkWidget* menuitem, gpointer
                                         data){
 
-  plugin_data *pd=(plugin_data *)data;
+//  plugin_data *pd=(plugin_data *)data;
   alarm_t *alrm;
-  alrm = (alarm_t *) pd->selected->data;
+//  alrm = (alarm_t *) pd->selected->data;
+  alrm = (alarm_t *) data;
 
 
   /* If paused, we resume */
   if(alrm->isPaused){
-	
 	g_timer_continue(alrm->timer);
 	alrm->isPaused=FALSE;
 	
@@ -531,7 +531,7 @@ void make_menu(plugin_data *pd){
               
               gtk_menu_shell_append   (GTK_MENU_SHELL(pd->menu),menuitem);
               g_signal_connect    (G_OBJECT(menuitem),"activate",
-                      G_CALLBACK(pause_resume_selected),pd);
+                      G_CALLBACK(pause_resume_selected),alrm);
           }
           /* If the alarm is paused, the only option is to resume or stop */
           else if (alrm->isPaused) {
@@ -539,7 +539,7 @@ void make_menu(plugin_data *pd){
               
               gtk_menu_shell_append (GTK_MENU_SHELL(pd->menu),menuitem);
               g_signal_connect  (G_OBJECT(menuitem),"activate",
-                      G_CALLBACK(pause_resume_selected),pd);
+                      G_CALLBACK(pause_resume_selected),alrm);
               gtk_widget_show(menuitem);
               
               gtk_widget_show(menuitem);      
